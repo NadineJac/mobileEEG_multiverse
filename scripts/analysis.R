@@ -1,7 +1,5 @@
 # data analysis summary at beginning of results section
-# Developed in R version 4.2.1 (2022-06-23 ucrt) -- "Funny-Looking Kid"
-# Nadine Jacobsen (University of Oldenburg) 
-# January 2024, last revision: 23-January-2024
+#details on autor and computing environment here
 
 # ADAPT: directory of your Database.xlsx file
 PATH <- "C:\\Users\\alfi7048\\Documents\\Psychologie\\otto_projects\\naj_meteor\\mobileEEG\\PreprocessingMobileP3Gait\\data\\"
@@ -10,9 +8,12 @@ setwd(PATH)
 library(readxl)
 library(stringr)
 library(ggplot2)
+library(dplyr)
+library(RColorBrewer)
 
 # Load data ---------------------------------------------------------------
 df_steps <- read_excel("Database.xlsx", sheet = "Coding_steps")
+df_opts <- read_excel("Database.xlsx", sheet = "Coding_options")
 
 # Number of processing steps ----------------------------------------------
 # the articles ID and each step are a nonzero element
@@ -27,11 +28,16 @@ sd(num_steps)           # SD
 
 df_manual <- df_steps
 df_manual = subset(df_manual, select = -c(Key)) # delete "Key" column
+df_opts = subset(df_opts, select = -c(Key)) # delete "Key" column
 
 for (i in colnames(df_manual)){
-  df_manual[[i]]<- str_count(df_manual[[i]], "manual")
+  #df_manual[[i]]<- str_count(df_manual[[i]], "Visual inspection")
+  df_manual[[i]]<- grepl("Visual inspection", df_manual[[i]], fixed = T)
 }
-num_manual <- rowSums(df_manual) # add number of manual steps per article
+for (i in colnames(df_opts)){
+  df_opts[[i]]<- grepl("manual", df_opts[[i]], fixed = T)
+}
+num_manual <- rowSums(df_manual) + rowSums(df_opts) # add number of manual steps per article
 sum(num_manual!= 0)     # number of articles using any manual processing step
 (sum(num_manual!= 0)/length(num_manual))*100# percentage of articles using any manual processing step
 summary(num_manual)     # summary of number of manual steps per paper (range, mean)
@@ -92,15 +98,16 @@ for (si in shared) {
   df_OS$value[8+counter] <- (sum(dat$open_materials == si))
 }
 
-my_col <- brewer.pal(4,"RdYlGn") # switch to flat colors
+# my_col <- brewer.pal(4,"RdYlGn") # switch to flat colors
+my_col <- brewer.pal(4,"Greys") # switch to greyscale
 
 ggplot(df_OS, aes(fill=condition, y=value, x=OS_practice)) + 
-  geom_bar(position="stack", stat="identity") +
+  geom_bar(position="stack", stat="identity", color = "black") +
   scale_fill_manual(values = my_col) +
   labs(x = "Open scholarship practice",
        y = "Number of articles",
        fill = "Use") +
   theme(text = element_text(size = 14),
         legend.position = "bottom")
-ggsave(file.path("results","OS_practices.jpg"), dpi = 300, height = 8, width = 6)
+ggsave(file.path("results","OS_practices2.jpg"), dpi = 300, height = 6, width = 6)
 
