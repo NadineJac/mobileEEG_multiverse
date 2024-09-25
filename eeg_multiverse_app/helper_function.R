@@ -22,6 +22,10 @@ library(readxl)       # v1.4.3
 rm(list = ls())
 Sys.setlocale('LC_CTYPE','C')
 
+# Load data from crowd survey
+load("data_crowd.Rdata")
+load("options_crowd.Rdata")
+
 #############################
 #########ReadData############
 #############################
@@ -34,6 +38,9 @@ dat_op_or[dat_op_or == ""] <- NA
 dat_op <- read_excel("Database.xlsx", sheet = "Coding_options", na = "NA")
 dat_prep_op1 <- select(dat_op, contains("Choice"))
 dat_prep_op1[dat_prep_op1 == ""] <- NA 
+dat_comment <- read_excel("Database.xlsx", sheet = "Coding_comments", na = "NA")
+dat_comment[dat_comment == 0] <- NA 
+dat_prep_op1[dat_prep_op1 == ""] <- NA 
 steps_op <- read_excel("Database.xlsx", sheet = "All_options")
 p_inf <- read_excel("Database.xlsx", sheet = "Paper_info")
 p_inf$DOI <- sprintf('<a href="https://doi.org/%s" target="_blank">%s</a>', p_inf$DOI, p_inf$DOI)
@@ -41,7 +48,7 @@ p_inf2 <- read_excel("Database.xlsx", sheet = "Paper_info2")
 p_inf2$DOI <- sprintf('<a href="https://doi.org/%s" target="_blank">%s</a>', p_inf2$DOI, p_inf2$DOI)
 as.integer(p_inf$Year)
 cn_p_inf <- colnames(p_inf)
-MetaData <- read_excel("Database.xlsx", sheet = "metadata")
+MetaData <- read_excel("Database.xlsx", sheet = "metadata2")
 MetaData <- MetaData %>%
   mutate_all(~ ifelse(. == "NA", "Not_reported", .))
 ExperimentModels <- read_excel("Database.xlsx", sheet = "EEGAcquisition")
@@ -60,8 +67,8 @@ OpenScienceMeta <- read_excel("Database.xlsx", sheet = "EEGOpenScience")
 OpenScienceMeta <- OpenScienceMeta %>%
   mutate_all(~ ifelse(. == "NA", "Not_reported", .))
 OpenScienceMeta <- unique(OpenScienceMeta)
-ListSteps <- steps[, c(2,3,4)]
-colnames(ListSteps) <- c("Step", "Group", "Definiton")
+ListSteps <- steps[, c(2,3,4,5,6)]
+colnames(ListSteps) <- c("Step", "Group", "Definiton", "Info", "Link")#changed here
 ListOptions <- steps_op[, c(1, 3, 4)]
 colnames(ListOptions) <- c("Option", "Step", "Definition")
 #dat with name visual
@@ -247,7 +254,7 @@ for (p in 1:length(dat_op$Key)){
   target_op <- c(dat_prep_op$Choice2, dat_prep_op$Choice3, dat_prep_op$Choice4, dat_prep_op$Choice5,
                  dat_prep_op$Choice6, dat_prep_op$Choice7, dat_prep_op$Choice8, dat_prep_op$Choice9, dat_prep_op$Choice10, dat_prep_op$Choice11,
                  dat_prep_op$Choice12, dat_prep_op$Choice13, dat_prep_op$Choice14, dat_prep_op$Choice15, dat_prep_op$Choice16)#num choices
-    dat2_op <- data.frame(table(source_op, target_op))
+  dat2_op <- data.frame(table(source_op, target_op))
   value_op <- c()
   for (i in 1:length(source_op)){
     s <- source_op[i]
@@ -290,44 +297,76 @@ clrs_op <- all_clrs[1:length(unique(nodes_op$Groups))]
 #########Further Analyses###########
 ####################################
 ###Yes or no
-st <- nodes[ ,"Names"]
-st <- data.frame(st)
-colnames(st) <- "Names"
-# mat_yn <- matrix(0, nrow = length(st$Names), ncol = length(st$Names))
-# for (i in 1:length(st$Names)){
-#   sti <- st$Names[i]
-#   id_i <- which(dat == sti, arr.ind = T)
-#   for (j in 1:length(st$Names)){
-#     stj <- st$Names[j]
-#     id_j <- which(dat == stj, arr.ind = T)
-#     use_both <- merge(id_i, id_j, by = "row")
-#     n_p <- length(use_both$row)
-#     mat_yn[i,j] <- n_p
-#   }
-# }
-# colnames(mat_yn) <- nodes$Names_vis
-# rownames(mat_yn) <- nodes$Names_vis
+target_file <- "mat_yn.RDS"
+source_file <- "Database.xlsx"
+file_info_source <- file.info(source_file)
+generateFile <- F
 
-mat_yn <- readRDS("mat_yn.RDS")
+if (!file.exists(target_file)) {
+  generateFile <- T}
+if (file.exists(target_file)) {
+  file_info_target <- file.info(target_file)
+  if (file_info_target$mtime <= file_info_source$mtime) {
+    generateFile <- T}}
+
+if (generateFile) {
+  # Target file is older or has the same modification time as the source file
+  # Proceed to generate the target file
+  st <- nodes[ ,"Names"]
+  st <- data.frame(st)
+  colnames(st) <- "Names"
+  mat_yn <- matrix(0, nrow = length(st$Names), ncol = length(st$Names))
+  for (i in 1:length(st$Names)){
+    sti <- st$Names[i]
+    id_i <- which(dat == sti, arr.ind = T)
+    for (j in 1:length(st$Names)){
+      stj <- st$Names[j]
+      id_j <- which(dat == stj, arr.ind = T)
+      use_both <- merge(id_i, id_j, by = "row")
+      n_p <- length(use_both$row)
+      mat_yn[i,j] <- n_p
+    }
+  }
+  colnames(mat_yn) <- nodes$Names_vis
+  rownames(mat_yn) <- nodes$Names_vis
+  saveRDS(mat_yn, file = target_file)
+}
+mat_yn <- readRDS(target_file)
 
 ###Steps
-# mat_or <- matrix(0, nrow = length(st$Names), ncol = length(st$Names))
-# for (i in 1:length(st$Names)){
-#   sti <- st$Names[i]
-#   id_i <- which(dat == sti, arr.ind = T)
-#   for (j in 1:length(st$Names)){
-#     stj <- st$Names[j]
-#     id_j <- which(dat == stj, arr.ind = T)
-#     use_both <- merge(id_i, id_j, by = "row")
-#     ord <- use_both$col.x - use_both$col.y
-#     i_first <- length(which(ord<0))
-#     mat_or[i,j] <- i_first
-#   }
-# }
-# colnames(mat_or) <- nodes$Names_vis
-# rownames(mat_or) <- nodes$Names_vis
-# saveRDS(mat_or, file = "mat_or.RDS")
-mat_or <- readRDS("mat_or.RDS")
+target_file <- "mat_or.RDS"
+source_file <- "Database.xlsx"
+file_info_source <- file.info(source_file)
+generateFile <- F
+
+if (!file.exists(target_file)) {
+  generateFile <- T}
+if (file.exists(target_file)) {
+  file_info_target <- file.info(target_file)
+  if (file_info_target$mtime <= file_info_source$mtime) {
+    generateFile <- T}}
+
+if (generateFile) {
+  # Target file is older or has the same modification time as the source file
+  # Proceed to generate the target file
+  mat_or <- matrix(0, nrow = length(st$Names), ncol = length(st$Names))
+  for (i in 1:length(st$Names)){
+    sti <- st$Names[i]
+    id_i <- which(dat == sti, arr.ind = T)
+    for (j in 1:length(st$Names)){
+      stj <- st$Names[j]
+      id_j <- which(dat == stj, arr.ind = T)
+      use_both <- merge(id_i, id_j, by = "row")
+      ord <- use_both$col.x - use_both$col.y
+      i_first <- length(which(ord<0))
+      mat_or[i,j] <- i_first
+    }
+  }
+  colnames(mat_or) <- nodes$Names_vis
+  rownames(mat_or) <- nodes$Names_vis
+  saveRDS(mat_or, file = target_file)
+}
+mat_or <- readRDS(target_file)
 
 #######################
 #########DIY###########
